@@ -58,6 +58,17 @@ defmodule RedisScriptsTest do
       assert Redix.command(redis, ~w(ZRANGEBYSCORE retry -inf +inf WITHSCORES)) == { :ok, [other_job, "45"] }
       assert Redix.command(redis, ~w(LRANGE queue:test_queue 0 -1)) == { :ok, [job, enqueued_job] }
     end
+
+    test "enqueue job to queue and ask enqueued_at to be populated", %{ redis: redis } do
+      schedulled_job = "{\"jid\":\"123\",\"queue\":\"test_queue\"}"
+      enqueued_shedulled_job = "{\"jid\":\"123\",\"enqueued_at\":\"42\",\"queue\":\"test_queue\"}"
+
+      { :ok, _ } = Redix.command(redis, ~w(DEL schedule queue:test_queue))
+      { :ok, _ } = Redix.command(redis, ~w(ZADD schedule 42 #{schedulled_job}))
+
+      assert Redix.command(redis, ["EVAL", @enqueue_retriable_job_script, 1, "schedule", "41", true]) == { :ok, nil }
+      assert Redix.command(redis, ["EVAL", @enqueue_retriable_job_script, 1, "schedule", "42", true]) == { :ok, enqueued_shedulled_job }
+    end
   end
 
   describe "requeue_job_now" do

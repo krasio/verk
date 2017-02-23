@@ -52,12 +52,13 @@ defmodule Verk.ScheduleManager do
   Search for scheduled jobs to be done and if removal succeeds enqueue the job
   """
   def handle_info(:fetch_scheduled, state) do
-    handle_info(:fetch_scheduled, state, @schedule_key)
+    handle_info(:fetch_scheduled, state, @schedule_key, [true])
   end
 
-  defp handle_info(fetch_message, state, queue) do
+  defp handle_info(fetch_message, state, queue, populate_enqueued_at \\ []) do
     now = Time.now |> DateTime.to_unix(:seconds)
-    case Redix.command(state.redis, ["EVALSHA", @enqueue_retriable_script_sha, 1, queue, now]) do
+    command_args = ["EVALSHA", @enqueue_retriable_script_sha, 1, queue, now] ++ populate_enqueued_at
+    case Redix.command(state.redis, command_args) do
       {:ok, nil} ->
         schedule_fetch!(fetch_message)
         {:noreply, state}
